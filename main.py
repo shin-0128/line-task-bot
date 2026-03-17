@@ -131,7 +131,7 @@ def detect_tasks_from_text(text: str, context: dict) -> list[dict]:
     print(f"[DEBUG] JSON length: {len(raw)}")
     print(f"[DEBUG] last 20 chars: {repr(raw[-20:])}")
     try:
-        detected = json.loads(raw)
+        detected = json.loads(raw.strip("' \n\t"))
     except json.JSONDecodeError as e:
         print(f"[DEBUG] JSON parse error: {e}")
         print(f"[DEBUG] Problematic JSON: {repr(raw)}")
@@ -178,7 +178,7 @@ def detect_tasks_from_image(image_data: bytes, media_type: str, context: dict) -
 
     raw = extract_json_text(response)
     try:
-        detected = json.loads(raw)
+        detected = json.loads(raw.strip("' \n\t"))
     except json.JSONDecodeError as e:
         print(f"[DEBUG] JSON parse error: {e}")
         print(f"[DEBUG] Problematic JSON: {repr(raw)}")
