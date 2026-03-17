@@ -5,14 +5,13 @@ import json
 import os
 import uuid
 from datetime import datetime
-from pathlib import Path
-
 import anthropic
 import httpx
 from fastapi import FastAPI, Request, HTTPException
 from dotenv import load_dotenv
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
+from upstash_redis import Redis
 
 load_dotenv()
 
@@ -22,15 +21,10 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")
 GOOGLE_CREDENTIALS_JSON = os.getenv("GOOGLE_CREDENTIALS_JSON")
 
-LOG_DIR = Path("logs")
-LOG_DIR.mkdir(exist_ok=True)
-
-TASKS_DIR = Path("tasks")
-TASKS_DIR.mkdir(exist_ok=True)
-
 app = FastAPI()
 
 claude = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+redis = Redis(url=os.environ["UPSTASH_REDIS_REST_URL"], token=os.environ["UPSTASH_REDIS_REST_TOKEN"])
 
 TASK_DETECTION_PROMPT = """\
 以下のメッセージからタスク（やるべき仕事・依頼・締め切り付きの作業）を検出してください。
@@ -68,32 +62,13 @@ def verify_signature(body: bytes, signature: str) -> bool:
 
 def save_log(event: dict) -> None:
     today = datetime.now().strftime("%Y-%m-%d")
-    log_file = LOG_DIR / f"{today}.json"
-
-    records = []
-    if log_file.exists():
-        with open(log_file, "r", encoding="utf-8") as f:
-            records = json.load(f)
-
-    records.append(event)
-
-    with open(log_file, "w", encoding="utf-8") as f:
-        json.dump(records, f, ensure_ascii=False, indent=2)
+    redis.rpush(f"logs:{today}", json.dumps(event))
 
 
 def save_tasks(tasks: list[dict]) -> None:
     today = datetime.now().strftime("%Y-%m-%d")
-    tasks_file = TASKS_DIR / f"{today}.json"
-
-    records = []
-    if tasks_file.exists():
-        with open(tasks_file, "r", encoding="utf-8") as f:
-            records = json.load(f)
-
-    records.extend(tasks)
-
-    with open(tasks_file, "w", encoding="utf-8") as f:
-        json.dump(records, f, ensure_ascii=False, indent=2)
+    for task in tasks:
+        redis.rpush(f"tasks:{today}", json.dumps(task))
 
 
 def get_sheets_service():

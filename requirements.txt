@@ -5,3 +5,4 @@ anthropic
 httpx
 google-auth
 google-api-python-client
+upstash-redis
