@@ -126,12 +126,15 @@ def detect_tasks_from_text(text: str, context: dict) -> list[dict]:
         ],
     )
 
-    raw = extract_json_text(response)
-    print(f"[DEBUG] raw JSON: {repr(raw)}")
-    print(f"[DEBUG] JSON length: {len(raw)}")
-    print(f"[DEBUG] last 20 chars: {repr(raw[-20:])}")
+    text = response.content[0].text
+    print(f"[DEBUG] full response: {repr(text)}")
+    clean = text.strip()
+    if clean[0] == "'":
+        clean = clean[1:]
+    if clean[-1] == "'":
+        clean = clean[:-1]
     try:
-        detected = json.loads(raw.strip("' \n\t"))
+        detected = json.loads(clean)
     except json.JSONDecodeError as e:
         print(f"[DEBUG] JSON parse error: {e}")
         print(f"[DEBUG] Problematic JSON: {repr(raw)}")
