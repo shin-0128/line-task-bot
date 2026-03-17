@@ -253,7 +253,10 @@ async def webhook(request: Request):
                 tasks = detect_tasks_from_text(text, context)
                 if tasks:
                     save_tasks(tasks)
-                    append_tasks_to_sheet(tasks)
+                    try:
+                        append_tasks_to_sheet(tasks)
+                    except Exception as sheet_error:
+                        print(f"[ERROR] Sheets書き込み失敗: {sheet_error}")
                     for t in tasks:
                         print(f"[TASK] {t['content']} / 担当: {t['assigned_to']} / 期限: {t['deadline']}")
                 else:
