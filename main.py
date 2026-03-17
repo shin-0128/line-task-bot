@@ -113,7 +113,7 @@ def extract_json_text(response) -> str:
     end = raw.rfind("]") + 1
     if start != -1 and end > start:
         raw = raw[start:end]
-    return raw
+    return raw.strip().strip("'\"")
 
 
 def detect_tasks_from_text(text: str, context: dict) -> list[dict]:
