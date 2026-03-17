@@ -106,22 +106,11 @@ def append_tasks_to_sheet(tasks: list[dict]) -> None:
 
 
 def extract_json_text(response) -> str:
-    raw = response.content[0].text
-    start = raw.find("[")
-    end = raw.rfind("]")
-    if start != -1 and end != -1 and end >= start:
-        candidate = raw[start:end+1]
-        try:
-            json.loads(candidate)
-            return candidate
-        except json.JSONDecodeError:
-            pass
-    clean = raw.strip().strip("'\"` \n\t")
-    start = clean.find("[")
-    end = clean.rfind("]")
-    if start != -1 and end != -1:
-        return clean[start:end+1]
-    return clean
+    text = response.content[0].text
+    match = __import__('re').search(r'\[.*\]', text, __import__('re').DOTALL)
+    if match:
+        return match.group()
+    return text.strip()
 
 
 def detect_tasks_from_text(text: str, context: dict) -> list[dict]:
