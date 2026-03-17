@@ -117,39 +117,37 @@ def detect_tasks_from_text(text: str, context: dict) -> list[dict]:
     response = claude.messages.create(
         model="claude-opus-4-6",
         max_tokens=1024,
-        system="あなたはJSONのみを返すAPIです。説明文、マークダウン、クォートは一切使わず、JSONの配列だけを返してください。最初の文字は[、最後の文字は]にしてください。",
-        messages=[
-            {
-                "role": "user",
-                "content": f"{TASK_DETECTION_PROMPT}\n\nメッセージ:\n{text}",
+        tools=[{
+            "name": "save_tasks",
+            "description": "検出したタスクを保存する",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "tasks": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "content": {"type": "string"},
+                                "assigned_to": {"type": "string"},
+                                "deadline": {"type": "string"},
+                                "raw_task_text": {"type": "string"}
+                            },
+                            "required": ["content", "raw_task_text"]
+                        }
+                    }
+                },
+                "required": ["tasks"]
             }
-        ],
+        }],
+        tool_choice={"type": "any"},
+        messages=[{"role": "user", "content": f"{TASK_DETECTION_PROMPT}\n\nメッセージ:\n{text}"}],
     )
-
-    text = response.content[0].text
-    print(f"[DEBUG] full response: {repr(text)}")
-    clean = text.strip()
-    if clean[0] == "'":
-        clean = clean[1:]
-    if clean[-1] == "'":
-        clean = clean[:-1]
-    try:
-        detected = json.loads(clean)
-    except json.JSONDecodeError as e:
-        print(f"[DEBUG] JSON parse error: {e}")
-        print(f"[DEBUG] Problematic JSON: {repr(raw)}")
-        raise
-
-    return [
-        {
-            "id": str(uuid.uuid4()),
-            "timestamp": datetime.now().isoformat(),
-            "source": "text",
-            **context,
-            **task,
-        }
-        for task in detected
-    ]
+    for block in response.content:
+        if block.type == "tool_use":
+            detected = block.input.get("tasks", [])
+            return [{"id": str(uuid.uuid4()), "timestamp": datetime.now().isoformat(), "source": "text", **context, **task} for task in detected]
+    return []
 
 
 def detect_tasks_from_image(image_data: bytes, media_type: str, context: dict) -> list[dict]:
