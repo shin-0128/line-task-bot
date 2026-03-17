@@ -1,0 +1,25 @@
+# 機密情報
+.env
+credentials.json
+*-service-account*.json
+*-key.json
+
+# ログ・タスクデータ（ローカル保存のみ）
+logs/
+tasks/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.DS_Store
