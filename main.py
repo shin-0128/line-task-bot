@@ -110,7 +110,8 @@ def extract_json_text(response) -> str:
     start = raw.find("[")
     end = raw.rfind("]") + 1
     if start != -1 and end > start:
-        return raw[start:end]
+        result = raw[start:end]
+        return result.strip().strip("'")
     return raw
 
 
