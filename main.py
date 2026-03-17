@@ -41,6 +41,8 @@ TASK_DETECTION_PROMPT = """
 - 「〜しておくこと」「〜すること」
 - 「〜やってください」「〜対応して」
 
+deadlineについて：「明日」「来週」「今週中」などの相対的な表現は今日の日付2026-03-17を基準に計算してYYYY-MM-DD形式に変換すること。期限が全く言及されていない場合のみnullにする。
+
 タスクが検出された場合はsave_tasksツールを呼び出してください。
 タスクがなければ空のリストでsave_tasksを呼び出してください。
 """
@@ -59,7 +61,7 @@ TASK_TOOL = {
                     "properties": {
                         "content": {"type": "string", "description": "タスクの内容（簡潔に）"},
                         "assigned_to": {"type": "string", "description": "担当者名。明示されていなければ空文字列。"},
-                        "deadline": {"type": "string", "description": "期限（YYYY-MM-DD形式）。明示されていなければ空文字列。"},
+                        "deadline": {"type": "string", "description": "期限（YYYY-MM-DD形式）。明日=2026-03-18、来週=2026-03-24、今週中=2026-03-21など今日2026-03-17基準で計算。期限の言及が全くない場合のみ空文字列。"},
                         "raw_task_text": {"type": "string", "description": "タスクとして検出した元の文章"}
                     },
                     "required": ["content", "raw_task_text", "assigned_to", "deadline"]
