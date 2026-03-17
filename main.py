@@ -97,8 +97,9 @@ def save_tasks(tasks: list[dict]) -> None:
 
 
 def get_sheets_service():
-    credentials = service_account.Credentials.from_service_account_file(
-        GOOGLE_CREDENTIALS_JSON,
+    info = json.loads(GOOGLE_CREDENTIALS_JSON)
+    credentials = service_account.Credentials.from_service_account_info(
+        info,
         scopes=["https://www.googleapis.com/auth/spreadsheets"],
     )
     return build("sheets", "v4", credentials=credentials)
