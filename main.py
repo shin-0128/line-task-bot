@@ -141,6 +141,8 @@ def detect_tasks_from_text(text: str, context: dict) -> list[dict]:
         if block.type == "tool_use":
             detected = block.input.get("tasks", [])
             print(f"[DEBUG] tool_use detected {len(detected)} tasks")
+            for task in detected:
+                print(f"[DEBUG] task data: {task}")
             return [
                 {
                     "id": str(uuid.uuid4()),
