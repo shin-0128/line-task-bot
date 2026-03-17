@@ -106,13 +106,12 @@ def append_tasks_to_sheet(tasks: list[dict]) -> None:
 
 
 def extract_json_text(response) -> str:
-    raw = response.content[0].text.strip()
+    raw = response.content[0].text
     start = raw.find("[")
-    end = raw.rfind("]") + 1
-    if start != -1 and end > start:
-        result = raw[start:end]
-        return result.strip().strip("'")
-    return raw
+    end = raw.rfind("]")
+    if start != -1 and end != -1 and end > start:
+        return raw[start:end+1]
+    return raw.strip()
 
 
 def detect_tasks_from_text(text: str, context: dict) -> list[dict]:
@@ -131,7 +130,12 @@ def detect_tasks_from_text(text: str, context: dict) -> list[dict]:
     print(f"[DEBUG] raw JSON: {repr(raw)}")
     print(f"[DEBUG] JSON length: {len(raw)}")
     print(f"[DEBUG] last 20 chars: {repr(raw[-20:])}")
-    detected = json.loads(raw)
+    try:
+        detected = json.loads(raw)
+    except json.JSONDecodeError as e:
+        print(f"[DEBUG] JSON parse error: {e}")
+        print(f"[DEBUG] Problematic JSON: {repr(raw)}")
+        raise
 
     return [
         {
@@ -173,7 +177,12 @@ def detect_tasks_from_image(image_data: bytes, media_type: str, context: dict) -
     )
 
     raw = extract_json_text(response)
-    detected = json.loads(raw)
+    try:
+        detected = json.loads(raw)
+    except json.JSONDecodeError as e:
+        print(f"[DEBUG] JSON parse error: {e}")
+        print(f"[DEBUG] Problematic JSON: {repr(raw)}")
+        raise
 
     return [
         {
