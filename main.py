@@ -101,12 +101,12 @@ def get_sheets_service():
     return build("sheets", "v4", credentials=credentials)
 
 
-def append_tasks_to_sheet(tasks: list[dict], display_name: str = "") -> None:
+def append_tasks_to_sheet(tasks: list[dict], display_name: str = "", group_name: str = "") -> None:
     service = get_sheets_service()
     rows = [
         [
             t.get("timestamp", ""),
-            t.get("group_id", ""),
+            group_name,
             display_name,
             t.get("content", ""),
             t.get("assigned_to") or "",
@@ -214,6 +214,16 @@ async def get_line_display_name(user_id: str) -> str:
     return user_id
 
 
+async def get_line_group_name(group_id: str) -> str:
+    url = f"https://api.line.me/v2/bot/group/{group_id}/summary"
+    headers = {"Authorization": f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}"}
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(url, headers=headers)
+        if resp.status_code == 200:
+            return resp.json().get("groupName", group_id)
+    return group_id
+
+
 async def download_line_content(message_id: str) -> tuple[bytes, str]:
     url = f"https://api-data.line.me/v2/bot/message/{message_id}/content"
     headers = {"Authorization": f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}"}
@@ -265,7 +275,8 @@ async def webhook(request: Request):
                     save_tasks(tasks)
                     try:
                         display_name = await get_line_display_name(user_id)
-                        append_tasks_to_sheet(tasks, display_name)
+                        group_name = await get_line_group_name(group_id)
+                        append_tasks_to_sheet(tasks, display_name, group_name)
                     except Exception as sheet_error:
                         print(f"[ERROR] Sheets書き込み失敗: {sheet_error}")
                     for t in tasks:
