@@ -104,16 +104,11 @@ def append_tasks_to_sheet(tasks: list[dict]) -> None:
 
 def extract_json_text(response) -> str:
     raw = response.content[0].text.strip()
-    if "```" in raw:
-        raw = raw.split("```")[1]
-        if raw.startswith("json"):
-            raw = raw[4:]
-    raw = raw.strip()
     start = raw.find("[")
     end = raw.rfind("]") + 1
     if start != -1 and end > start:
-        raw = raw[start:end]
-    return raw.strip().strip("'\"")
+        return raw[start:end]
+    return raw
 
 
 def detect_tasks_from_text(text: str, context: dict) -> list[dict]:
