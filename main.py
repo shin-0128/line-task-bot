@@ -126,6 +126,12 @@ def append_tasks_to_sheet(tasks: list[dict], display_name: str = "", group_name:
 
 
 def detect_tasks_from_text(text: str, context: dict) -> list[dict]:
+    from datetime import timedelta
+    today = datetime.now().strftime("%Y-%m-%d")
+    tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+    next_week = (datetime.now() + timedelta(days=7)).strftime("%Y-%m-%d")
+    this_week_end = (datetime.now() + timedelta(days=(6 - datetime.now().weekday()))).strftime("%Y-%m-%d")
+
     response = claude.messages.create(
         model="claude-opus-4-6",
         max_tokens=1024,
@@ -134,7 +140,7 @@ def detect_tasks_from_text(text: str, context: dict) -> list[dict]:
         messages=[
             {
                 "role": "user",
-                "content": f"{TASK_DETECTION_PROMPT}\n\nメッセージ:\n{text}",
+                "content": f"{TASK_DETECTION_PROMPT}\n\n今日の日付: {today}\n明日: {tomorrow}\n今週末: {this_week_end}\n来週: {next_week}\n\nメッセージ:\n{text}",
             }
         ],
     )
@@ -161,6 +167,12 @@ def detect_tasks_from_text(text: str, context: dict) -> list[dict]:
 
 
 def detect_tasks_from_image(image_data: bytes, media_type: str, context: dict) -> list[dict]:
+    from datetime import timedelta
+    today = datetime.now().strftime("%Y-%m-%d")
+    tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+    next_week = (datetime.now() + timedelta(days=7)).strftime("%Y-%m-%d")
+    this_week_end = (datetime.now() + timedelta(days=(6 - datetime.now().weekday()))).strftime("%Y-%m-%d")
+
     image_b64 = base64.standard_b64encode(image_data).decode("utf-8")
 
     response = claude.messages.create(
@@ -182,7 +194,7 @@ def detect_tasks_from_image(image_data: bytes, media_type: str, context: dict) -
                     },
                     {
                         "type": "text",
-                        "text": f"{TASK_DETECTION_PROMPT}\n\n上の画像に含まれるテキストや内容からタスクを検出してください。",
+                        "text": f"{TASK_DETECTION_PROMPT}\n\n今日の日付: {today}\n明日: {tomorrow}\n今週末: {this_week_end}\n来週: {next_week}\n\n上の画像に含まれるテキストや内容からタスクを検出してください。",
                     },
                 ],
             }
