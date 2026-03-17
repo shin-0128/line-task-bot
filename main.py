@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import hashlib
 import hmac
 import base64
@@ -5,6 +6,7 @@ import json
 import os
 import uuid
 from datetime import datetime
+
 import anthropic
 import httpx
 from fastapi import FastAPI, Request, HTTPException
@@ -24,9 +26,12 @@ GOOGLE_CREDENTIALS_JSON = os.getenv("GOOGLE_CREDENTIALS_JSON")
 app = FastAPI()
 
 claude = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-redis = Redis(url=os.environ["UPSTASH_REDIS_REST_URL"], token=os.environ["UPSTASH_REDIS_REST_TOKEN"])
+redis = Redis(
+    url=os.environ["UPSTASH_REDIS_REST_URL"],
+    token=os.environ["UPSTASH_REDIS_REST_TOKEN"],
+)
 
-TASK_DETECTION_PROMPT = """\
+TASK_DETECTION_PROMPT = """
 以下のメッセージからタスク（やるべき仕事・依頼・締め切り付きの作業）を検出してください。
 
 タスクっぽい表現の例：
@@ -36,21 +41,34 @@ TASK_DETECTION_PROMPT = """\
 - 「〜しておくこと」「〜すること」
 - 「〜やってください」「〜対応して」
 
-タスクが検出された場合は次のJSON配列を返してください（タスクがなければ空配列 [] を返す）：
-[
-  {
-    "content": "タスクの内容（簡潔に）",
-    "assigned_to": "担当者名またはユーザーID（明示されていなければ null）",
-    "deadline": "期限（YYYY-MM-DD形式。明示されていなければ null）",
-    "raw_task_text": "タスクとして検出した元の文章"
-  }
-]
-
-必ずJSON配列のみを返してください。
-- 前後に説明文、コードブロック、クォートを一切つけないこと
-- 最初の文字は [ 、最後の文字は ] であること
-- タスクがなければ [] のみ返すこと
+タスクが検出された場合はsave_tasksツールを呼び出してください。
+タスクがなければ空のリストでsave_tasksを呼び出してください。
 """
+
+TASK_TOOL = {
+    "name": "save_tasks",
+    "description": "検出したタスクを保存する",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "tasks": {
+                "type": "array",
+                "description": "検出されたタスクのリスト。タスクがなければ空配列。",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "content": {"type": "string", "description": "タスクの内容（簡潔に）"},
+                        "assigned_to": {"type": "string", "description": "担当者名。明示されていなければ空文字列。"},
+                        "deadline": {"type": "string", "description": "期限（YYYY-MM-DD形式）。明示されていなければ空文字列。"},
+                        "raw_task_text": {"type": "string", "description": "タスクとして検出した元の文章"}
+                    },
+                    "required": ["content", "raw_task_text", "assigned_to", "deadline"]
+                }
+            }
+        },
+        "required": ["tasks"]
+    }
+}
 
 
 def verify_signature(body: bytes, signature: str) -> bool:
@@ -65,13 +83,13 @@ def verify_signature(body: bytes, signature: str) -> bool:
 
 def save_log(event: dict) -> None:
     today = datetime.now().strftime("%Y-%m-%d")
-    redis.rpush(f"logs:{today}", json.dumps(event))
+    redis.rpush(f"logs:{today}", json.dumps(event, ensure_ascii=False))
 
 
 def save_tasks(tasks: list[dict]) -> None:
     today = datetime.now().strftime("%Y-%m-%d")
     for task in tasks:
-        redis.rpush(f"tasks:{today}", json.dumps(task))
+        redis.rpush(f"tasks:{today}", json.dumps(task, ensure_ascii=False))
 
 
 def get_sheets_service():
@@ -105,48 +123,36 @@ def append_tasks_to_sheet(tasks: list[dict]) -> None:
     ).execute()
 
 
-def extract_json_text(response) -> str:
-    text = response.content[0].text
-    match = __import__('re').search(r'\[.*\]', text, __import__('re').DOTALL)
-    if match:
-        return match.group()
-    return text.strip()
-
-
 def detect_tasks_from_text(text: str, context: dict) -> list[dict]:
     response = claude.messages.create(
         model="claude-opus-4-6",
         max_tokens=1024,
-        tools=[{
-            "name": "save_tasks",
-            "description": "検出したタスクを保存する",
-            "input_schema": {
-                "type": "object",
-                "properties": {
-                    "tasks": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "content": {"type": "string"},
-                                "assigned_to": {"type": "string"},
-                                "deadline": {"type": "string"},
-                                "raw_task_text": {"type": "string"}
-                            },
-                            "required": ["content", "raw_task_text"]
-                        }
-                    }
-                },
-                "required": ["tasks"]
-            }
-        }],
+        tools=[TASK_TOOL],
         tool_choice={"type": "any"},
-        messages=[{"role": "user", "content": f"{TASK_DETECTION_PROMPT}\n\nメッセージ:\n{text}"}],
+        messages=[
+            {
+                "role": "user",
+                "content": f"{TASK_DETECTION_PROMPT}\n\nメッセージ:\n{text}",
+            }
+        ],
     )
+
     for block in response.content:
         if block.type == "tool_use":
             detected = block.input.get("tasks", [])
-            return [{"id": str(uuid.uuid4()), "timestamp": datetime.now().isoformat(), "source": "text", **context, **task} for task in detected]
+            print(f"[DEBUG] tool_use detected {len(detected)} tasks")
+            return [
+                {
+                    "id": str(uuid.uuid4()),
+                    "timestamp": datetime.now().isoformat(),
+                    "source": "text",
+                    **context,
+                    **task,
+                }
+                for task in detected
+            ]
+
+    print("[DEBUG] no tool_use block found")
     return []
 
 
@@ -156,6 +162,8 @@ def detect_tasks_from_image(image_data: bytes, media_type: str, context: dict) -
     response = claude.messages.create(
         model="claude-opus-4-6",
         max_tokens=1024,
+        tools=[TASK_TOOL],
+        tool_choice={"type": "any"},
         messages=[
             {
                 "role": "user",
@@ -177,24 +185,21 @@ def detect_tasks_from_image(image_data: bytes, media_type: str, context: dict) -
         ],
     )
 
-    raw = extract_json_text(response)
-    try:
-        detected = json.loads(raw.strip("' \n\t"))
-    except json.JSONDecodeError as e:
-        print(f"[DEBUG] JSON parse error: {e}")
-        print(f"[DEBUG] Problematic JSON: {repr(raw)}")
-        raise
+    for block in response.content:
+        if block.type == "tool_use":
+            detected = block.input.get("tasks", [])
+            return [
+                {
+                    "id": str(uuid.uuid4()),
+                    "timestamp": datetime.now().isoformat(),
+                    "source": "image",
+                    **context,
+                    **task,
+                }
+                for task in detected
+            ]
 
-    return [
-        {
-            "id": str(uuid.uuid4()),
-            "timestamp": datetime.now().isoformat(),
-            "source": "image",
-            **context,
-            **task,
-        }
-        for task in detected
-    ]
+    return []
 
 
 async def download_line_content(message_id: str) -> tuple[bytes, str]:
@@ -239,13 +244,7 @@ async def webhook(request: Request):
 
         if msg_type == "text":
             text = message.get("text", "")
-
-            log_entry = {
-                **context,
-                "text": text,
-                "raw_event": event,
-            }
-            save_log(log_entry)
+            save_log({**context, "text": text, "raw_event": event})
             print(f"[LOG] group={group_id} user={user_id} text={text}")
 
             try:
@@ -255,16 +254,13 @@ async def webhook(request: Request):
                     append_tasks_to_sheet(tasks)
                     for t in tasks:
                         print(f"[TASK] {t['content']} / 担当: {t['assigned_to']} / 期限: {t['deadline']}")
+                else:
+                    print("[LOG] タスクなし")
             except Exception as e:
                 print(f"[ERROR] タスク検出失敗 (text): {e}")
 
         elif msg_type == "image":
-            log_entry = {
-                **context,
-                "message_type": "image",
-                "raw_event": event,
-            }
-            save_log(log_entry)
+            save_log({**context, "message_type": "image", "raw_event": event})
             print(f"[LOG] group={group_id} user={user_id} type=image")
 
             try:
