@@ -128,6 +128,7 @@ def detect_tasks_from_text(text: str, context: dict) -> list[dict]:
     response = claude.messages.create(
         model="claude-opus-4-6",
         max_tokens=1024,
+        system="あなたはJSONのみを返すAPIです。説明文、マークダウン、クォートは一切使わず、JSONの配列だけを返してください。最初の文字は[、最後の文字は]にしてください。",
         messages=[
             {
                 "role": "user",
