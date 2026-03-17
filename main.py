@@ -129,6 +129,7 @@ def detect_tasks_from_text(text: str, context: dict) -> list[dict]:
     )
 
     raw = extract_json_text(response)
+    print(f"[DEBUG] raw JSON: {repr(raw)}")
     detected = json.loads(raw)
 
     return [
